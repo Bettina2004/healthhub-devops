@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healthhub-frontend
+  namespace: healthhub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: healthhub-frontend
+  template:
+    metadata:
+      labels:
+        app: healthhub-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: your-dockerhub-username/healthhub-frontend:latest
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: healthhub
+spec:
+  selector:
+    app: healthhub-frontend
+  ports:
+  - port: 80
+    targetPort: 80
+  type: LoadBalancer

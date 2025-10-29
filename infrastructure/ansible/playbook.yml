@@ -1,0 +1,59 @@
+---
+- name: Deploy HealthHub Application
+  hosts: all
+  become: yes
+  
+  vars:
+    docker_username: your-dockerhub-username
+  
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+    
+    - name: Install required packages
+      apt:
+        name:
+          - docker.io
+          - docker-compose
+          - python3-pip
+        state: present
+    
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+    
+    - name: Add user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+    
+    - name: Create app directory
+      file:
+        path: /opt/healthhub
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+    
+    - name: Copy docker-compose file
+      template:
+        src: docker-compose.prod.yml.j2
+        dest: /opt/healthhub/docker-compose.yml
+    
+    - name: Pull Docker images
+      docker_image:
+        name: "{{ item }}"
+        source: pull
+      loop:
+        - "postgres:15-alpine"
+        - "{{ docker_username }}/healthhub-backend:latest"
+        - "{{ docker_username }}/healthhub-frontend:latest"
+    
+    - name: Deploy application
+      docker_compose:
+        project_src: /opt/healthhub
+        state: present
+        pull: yes
