@@ -4,6 +4,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "echo \"No tests specified\" && exit 0"
+
   },
   "dependencies": {
     "cors": "^2.8.5",
