@@ -1,96 +1,35 @@
-name: HealthHub CI/CD Pipeline
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-
-env:
-  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-
-jobs:
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
+build:
+  name: Build Docker Images
+  needs: test
+  runs-on: ubuntu-latest
+  if: github.event_name == 'push'
+  
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
     
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      
-      - name: Install backend dependencies
-        working-directory: ./backend
-        run: npm ci
-      
-      - name: Run backend tests
-        working-directory: ./backend
-        run: npm test
-      
-      - name: Install frontend dependencies
-        working-directory: ./frontend
-        run: npm ci
-      
-      - name: Run frontend tests
-        working-directory: ./frontend
-        run: npm test -- --passWithNoTests
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
 
-  build:
-    name: Build Docker Images
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    # ✅ Place the DockerHub login step here
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
     
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      
-      - name: Build and push backend
-        uses: docker/build-push-action@v4
-        with:
-          context: ./backend
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/healthhub-backend:${{ github.sha }},${{ secrets.DOCKER_USERNAME }}/healthhub-backend:latest
-      
-      - name: Build and push frontend
-        uses: docker/build-push-action@v4
-        with:
-          context: ./frontend
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/healthhub-frontend:${{ github.sha }},${{ secrets.DOCKER_USERNAME }}/healthhub-frontend:latest
-
-  deploy:
-    name: Deploy to Kubernetes
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # 🧱 Build and push backend image
+    - name: Build and push backend
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/healthhub-backend:${{ github.sha }},${{ secrets.DOCKER_USERNAME }}/healthhub-backend:latest
     
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Configure kubectl
-        uses: azure/k8s-set-context@v3
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.KUBE_CONFIG }}
-      
-      - name: Deploy to Kubernetes
-        run: |
-          kubectl apply -f infrastructure/kubernetes/
-          kubectl rollout status deployment/healthhub-backend
-          kubectl rollout status deployment/healthhub-frontend
+    # 🧱 Build and push frontend image
+    - name: Build and push frontend
+      uses: docker/build-push-action@v4
+      with:
+        context: ./frontend
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/healthhub-frontend:${{ github.sha }},${{ secrets.DOCKER_USERNAME }}/healthhub-frontend:latest
